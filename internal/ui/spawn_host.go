@@ -195,16 +195,6 @@ func (m *Model) cachedDefaultToolSelection() ([]string, int) {
 	return m.cachedToolSelection(m.cachedHiddenTools(), "")
 }
 
-func (m *Model) cachedSpawnToolSelection() ([]string, int) {
-	names, index := m.cachedDefaultToolSelection()
-	for i, name := range names {
-		if name == m.ledger.spawner.LastSpawnTool {
-			return names, i
-		}
-	}
-	return names, index
-}
-
 func (m *Model) cachedSpawnWorktreeDefault(group string) bool {
 	for g := group; g != ""; g = uirail.ParentGroup(g) {
 		switch m.workspace.groupWorktrees[g] {
@@ -402,7 +392,7 @@ func (m *Model) groupEffectivelyArchived(path string) bool {
 func (m *Model) applyCachedFormDefaults() tea.Cmd {
 	f := m.form()
 	before := f.Tool()
-	f.SetTools(m.cachedSpawnToolSelection())
+	f.SetTools(m.cachedDefaultToolSelection())
 	f.DefaultWorktree(m.cachedSpawnWorktreeDefault(m.selectedGroupPath()))
 	toolName := f.Tool()
 	if toolName == before || toolName == "" {
