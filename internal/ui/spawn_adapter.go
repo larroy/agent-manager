@@ -518,9 +518,7 @@ func (m *Model) commitSpawn(request uilaunch.Request, sess store.Session) {
 		// The pick is the Settings default from now on, so the next form,
 		// the quick bar and an agent-manager spawn open on it. A remote
 		// spawn never reaches here, so it leaves the local default alone.
-		if m.settings.Cache.Value(uisettings.DefaultToolSetting) != request.ToolName {
-			m.saveChoiceSetting(uisettings.DefaultToolSetting, request.ToolName)
-		}
+		m.saveChoiceSetting(uisettings.DefaultToolSetting, request.ToolName)
 	}
 	// New sessions start as starting, which attention excludes; clear so the
 	// row the spawn just created is on screen.

@@ -395,7 +395,8 @@ func TestLastSpawnToolBecomesSettingsDefault(t *testing.T) {
 		t.Fatalf("settings default tool = %q, want the last spawn", got)
 	}
 
-	_, _ = m.closeSettings()
+	_, close := m.closeSettings()
+	m.applyCmd(t, close)
 	if err := m.services.store.SetDefaultTool("claude"); err != nil {
 		t.Fatal(err)
 	}
@@ -613,5 +614,34 @@ func TestSpawnBasePreviewNamesAFailedLookup(t *testing.T) {
 	m.recordBaseFetch(uilaunch.BaseFetchedMsg{Key: key})
 	if got := ansi.Strip(m.spawnBaseLabel(key.Dir, "")); got != "HEAD (auto)" {
 		t.Fatalf("label = %q, want HEAD (auto) when the repo names no default", got)
+	}
+}
+
+// A spawn accepted right before a quit completes during the drain and its
+// pick must still reach the store; a save enqueued then is the quit's
+// causal followup, not user work a drain refuses.
+func TestQuitDrainsTheSpawnedDefaultToolSave(t *testing.T) {
+	t.Parallel()
+	m := buildModel(t)
+	m.openForm()
+	pickFormTool(t, m, "ready-tool")
+	m.form().SetName("first")
+	m.form().SetDir(t.TempDir())
+	// The submit command runs the queued spawn, so the test leaves it
+	// unrun and the quit below drains a spawn in flight.
+	_, _ = m.submitForm()
+	if m.effects.Main.Active == nil {
+		t.Fatal("the spawn is not on the lane")
+	}
+	_, _ = m.requestQuit()
+	m.drainEffects(t)
+	if len(m.effects.Main.Pending) != 0 {
+		t.Fatal("quit accepted new user work")
+	}
+	if _, ok := m.nextEffectCmd()().(tea.QuitMsg); !ok {
+		t.Fatal("drained queue did not quit")
+	}
+	if tool, err := m.services.store.DefaultTool(); err != nil || tool != "ready-tool" {
+		t.Fatalf("stored default tool after quit = %q, %v; want the completed spawn, ready-tool", tool, err)
 	}
 }

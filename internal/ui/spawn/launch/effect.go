@@ -33,7 +33,8 @@ func (r GroupRequest) EffectCopy() uieffects.Request {
 
 func (r GroupRequest) Run(s Services) (uieffects.Result, error) { return RunGroup(s, r) }
 
-// ChoiceSaveRequest persists a CLI's kept choice or recent models. The
+// ChoiceSaveRequest persists a spawn pick the form and the quick bar read
+// back: a CLI's kept choice, its recent models, or the default tool. The
 // settings cache already holds the value, so the next form reads it without
 // waiting for the write.
 type ChoiceSaveRequest struct {
@@ -43,7 +44,12 @@ type ChoiceSaveRequest struct {
 
 func (ChoiceSaveRequest) EffectName() string { return "model choice save" }
 
-// Run carries nothing back: only its error reaches the model.
+// ChoiceSaveResult carries the stored value back when the write failed, so
+// the completion can undo the optimistic cache entry.
+type ChoiceSaveResult struct {
+	Stored string
+}
+
 func (r ChoiceSaveRequest) Run(s Services) (uieffects.Result, error) {
-	return nil, SaveChoice(s.Store, r.Key, r.Value)
+	return SaveChoice(s.Store, r.Key, r.Value)
 }

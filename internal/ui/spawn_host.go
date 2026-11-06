@@ -415,7 +415,24 @@ func (m *Model) fitChoices() {
 
 func (m *Model) saveChoiceSetting(key, value string) {
 	m.settings.Cache.ApplyValues([]uisettings.Value{{Key: key, Value: value}})
-	m.enqueueEffect(uilaunch.ChoiceSaveRequest{Key: key, Value: value}, 0, false)
+	m.settings.Pending++
+	// first lets the save ride a quit drain: a spawn completing while the
+	// manager exits still persists its pick. SaveChoice skips unchanged
+	// values, so repeating the pick costs no write.
+	m.enqueueEffect(uilaunch.ChoiceSaveRequest{Key: key, Value: value}, 0, m.effects.Quitting)
+}
+
+// applyChoiceSave releases the pending fence a saveChoiceSetting held
+// against settings loads, and on a failed write reconciles the cache to the
+// stored value so the UI shows what a restart will read back.
+func (m *Model) applyChoiceSave(request uilaunch.ChoiceSaveRequest, result uilaunch.ChoiceSaveResult, err error) {
+	if m.settings.Pending > 0 {
+		m.settings.Pending--
+	}
+	if err != nil {
+		m.settings.Cache.ApplyValues([]uisettings.Value{{Key: request.Key, Value: result.Stored}})
+		m.reportErr(err.Error())
+	}
 }
 
 func (m *Model) choiceSettingKeys() []string {
