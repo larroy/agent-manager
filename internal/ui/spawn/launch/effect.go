@@ -40,14 +40,20 @@ func (r GroupRequest) Run(s Services) (uieffects.Result, error) { return RunGrou
 type ChoiceSaveRequest struct {
 	Key   string
 	Value string
+	// Generation is the key's save generation when the pick replaced the
+	// cache, so a completion can tell whether a newer pick owns the value.
+	Generation uint64
 }
 
 func (ChoiceSaveRequest) EffectName() string { return "model choice save" }
 
 // ChoiceSaveResult carries the stored value back when the write failed, so
-// the completion can undo the optimistic cache entry.
+// the completion can undo the optimistic cache entry. Valid says the readback
+// succeeded; without it Stored is empty because nothing was read, not because
+// the store holds nothing.
 type ChoiceSaveResult struct {
 	Stored string
+	Valid  bool
 }
 
 func (r ChoiceSaveRequest) Run(s Services) (uieffects.Result, error) {

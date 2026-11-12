@@ -219,9 +219,9 @@ func SaveChoice(st SettingsStore, key, value string) (ChoiceSaveResult, error) {
 	}
 	stored, readErr := st.Setting(key)
 	if readErr != nil {
-		return ChoiceSaveResult{}, fmt.Errorf("saving %s: %w", key, err)
+		return ChoiceSaveResult{}, errors.Join(fmt.Errorf("saving %s: %w", key, err), fmt.Errorf("reading %s back: %w", key, readErr))
 	}
-	return ChoiceSaveResult{Stored: stored}, fmt.Errorf("saving %s: %w", key, err)
+	return ChoiceSaveResult{Stored: stored, Valid: true}, fmt.Errorf("saving %s: %w", key, err)
 }
 
 type SettingsStore interface {

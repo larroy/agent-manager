@@ -645,3 +645,51 @@ func TestQuitDrainsTheSpawnedDefaultToolSave(t *testing.T) {
 		t.Fatalf("stored default tool after quit = %q, %v; want the completed spawn, ready-tool", tool, err)
 	}
 }
+
+// A failed save reconciles the cache to the store only while its own pick is
+// still the newest: a newer pick owns the cache, and a failed readback knows
+// nothing to reconcile it to.
+func TestFailedChoiceSaveOnlyReconcilesItsOwnPick(t *testing.T) {
+	t.Parallel()
+	m := buildModel(t)
+	key := uisettings.DefaultToolSetting
+	m.saveChoiceSetting(key, "opencode")
+	m.saveChoiceSetting(key, "claude")
+	newest := m.settings.ChoiceGen[key]
+	saveErr := errors.New("disk full")
+
+	m.applyChoiceSave(
+		uilaunch.ChoiceSaveRequest{Key: key, Value: "opencode", Generation: newest - 1},
+		uilaunch.ChoiceSaveResult{Stored: "opencode", Valid: true}, saveErr)
+	if got := m.settings.Cache.Value(key); got != "claude" {
+		t.Fatalf("cached %s = %q after a stale failure, want the newer pick claude", key, got)
+	}
+
+	m.applyChoiceSave(
+		uilaunch.ChoiceSaveRequest{Key: key, Value: "claude", Generation: newest},
+		uilaunch.ChoiceSaveResult{}, saveErr)
+	if got := m.settings.Cache.Value(key); got != "claude" {
+		t.Fatalf("cached %s = %q after a failed readback, want the pick kept", key, got)
+	}
+
+	m.applyChoiceSave(
+		uilaunch.ChoiceSaveRequest{Key: key, Value: "claude", Generation: newest},
+		uilaunch.ChoiceSaveResult{Stored: "codex", Valid: true}, saveErr)
+	if got := m.settings.Cache.Value(key); got != "codex" {
+		t.Fatalf("cached %s = %q, want the stored codex after the failure read back", key, got)
+	}
+}
+
+// Each pick starts a generation of its own, so a completion can tell which
+// one it belongs to.
+func TestChoiceSaveStampsANewGeneration(t *testing.T) {
+	t.Parallel()
+	m := buildModel(t)
+	key := uisettings.DefaultToolSetting
+	before := m.settings.ChoiceGen[key]
+	m.saveChoiceSetting(key, "claude")
+	m.saveChoiceSetting(key, "opencode")
+	if got := m.settings.ChoiceGen[key]; got != before+2 {
+		t.Fatalf("generation = %d, want %d after two picks", got, before+2)
+	}
+}
