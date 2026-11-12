@@ -693,3 +693,32 @@ func TestChoiceSaveStampsANewGeneration(t *testing.T) {
 		t.Fatalf("generation = %d, want %d after two picks", got, before+2)
 	}
 }
+
+// A Settings save that replaces default_tool outranks a picker save still on
+// the lane: the picker's failed completion must not restore the older pick.
+func TestSettingsSaveOutranksAPendingPickerSave(t *testing.T) {
+	m := buildModel(t)
+	key := uisettings.DefaultToolSetting
+	m.saveChoiceSetting(key, "opencode")
+	picker := m.settings.ChoiceGen[key]
+
+	m.openSettings()
+	d := m.settingsCard().State()
+	d.Field = uisettings.FieldTool
+	m.cycleSetting(1)
+	chosen := d.ToolNames[d.ToolIndex]
+	if chosen == "opencode" {
+		t.Fatalf("settings row picked %q, want a tool the picker did not choose", chosen)
+	}
+	m.applyCmd(t, m.captureSettingsSave(d, true, false))
+	if got := m.settings.Cache.Value(key); got != chosen {
+		t.Fatalf("cached %s = %q, want the settings pick %q", key, got, chosen)
+	}
+
+	m.applyChoiceSave(
+		uilaunch.ChoiceSaveRequest{Key: key, Value: "opencode", Generation: picker},
+		uilaunch.ChoiceSaveResult{Stored: "opencode", Valid: true}, errors.New("disk full"))
+	if got := m.settings.Cache.Value(key); got != chosen {
+		t.Fatalf("cached %s = %q after the stale picker failure, want %q", key, got, chosen)
+	}
+}
